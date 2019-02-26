@@ -1,0 +1,417 @@
+---
+title: "Hypothesis Testing: T-Test, P-Value for Paired Data"
+author: "Navya Kumar"
+date: "22 January 2019"
+output: 
+    html_document:
+        keep_md: TRUE
+---
+
+The purpose of this document is to provide visual examples to ease the understanding of concepts related to hypothesis testing using t-tests and p-value for paired data. We will create some simple, entirely fictitious scenario and data for our examples. 
+
+## Scenario
+
+Imagine: Meditation Promoters Institute wants to statistically establish the benefits of meditation on people. The three hypotheses the Institute wants to test are, that meditation:   
+
+1. INCREASES concentration levels  
+2. DECREASES stress levels  
+3. DOES NOT CHANGE body weight  
+
+For their experiment, they recruit 12 volunteers and record their:  
+
+1. Concentration levels on a 5-point scale: 1 - very low to 5 - very high  
+2. Stress levels on a 5-point scale: 1 - very low to 5 - very high  
+3. Body weight in kgs.  
+
+This data is stored as "before". After a 6-month regime of daily 30-minute meditation, the same parameters are checked again, and the new data stored as "after".  
+
+## Dataset 
+
+```{r createdata, echo=FALSE}
+
+set.seed(321321)
+
+# Initiating dataset with fields subject.id and timing
+# subject.id varies from 1 to 12 (before set) and repeats (after set)
+# timing is set to "before" or "after" based on when the observation was taken
+    meditate = data.frame(subject.id = rep(1:12,2), timing = c(rep("before",12),rep("after",12)))
+
+# Adding field for concentration levels
+# First 12 rows have levels 1 to 3 randomly assigned (before set)
+# Next 12 rows have levels 3 to 5 randomly assigned (after set)
+    meditate$concentration = c(sample(rep(1:3,4)), sample(rep(3:5,4)))
+
+# Adding field for stress levels
+# First 12 rows have levels 3 to 5 randomly assigned (before set)
+# Next 12 rows have levels 1 to 3 randomly assigned (after set)
+    meditate$stress = c(sample(rep(3:5,4)), sample(rep(1:3,4)))
+
+# Adding field for body weight in kg
+# First 12 rows have weight 55kg to 66kg randomly assigned (before set)
+    meditate$weight[1:12] = sample(55:66)
+# Random weight changes -1kg, 0kg, 1kg
+    weightchange = sample(rep(-1:1,4)) 
+# Last 12 rows filled with original weight + weight change (after set)
+    meditate$weight[13:24] = meditate$weight[1:12] + weightchange 
+
+```
+
+We have created and stored experiment data in a data.frame called "meditate." It stores before and after data for each of the 12 subjects. Let us look at the size of the entire dataset and at records for three of the twelve volunteers. 
+
+```{r viewdata, echo=FALSE}
+
+dim(meditate)
+
+meditate[meditate$subject.id == 1:3,]
+
+```
+
+
+In all, 24 rows and 5 fields: 2 rows of "before" and "after" observations for 3 parameters: concentration, stress, and weight for each of the 12 subjects. 
+
+**Since the "before" and "after" sets are for the same subjects--not two independent groups--our data is PAIRED.**
+
+
+## Hypothesis testing: Increased concentration
+
+Let us look at the "concentration" data we have on the volunteers. 
+
+```{r concplot, echo=FALSE}
+
+with(meditate, {
+
+# set stage
+plot(NA,NA, xlab = "", ylab = "", xlim = c(1,13), ylim = c(1,6))
+Axis(1:12, at = 1:12, side = 1)
+Axis(1:5, at = 1:5, side = 2)
+title(xlab = "Subject ID", ylab = "Concentration Levels")
+title(main = "Concentration Levels: Before and After")
+abline(v = 1:12, col = "lightgrey", lty = 3)
+abline(h = 1:5, col = "lightgrey", lty = 3)
+
+# plot before and after levels 
+points(x=subject.id[timing=="before"], y=concentration[timing=="before"], pch = 15, col = "darkgrey", cex = 2)
+points(x=subject.id[timing=="after"], y=concentration[timing=="after"], pch = 20, col = "lightgreen", cex = 2)
+
+# legend
+legend("topright", cex = 0.75, pch = c(15,20), pt.cex = 2, col = c("darkgrey","lightgreen"), legend=c("Before","After"), text.width = strwidth("Before"))
+
+})
+
+
+```
+
+
+There does appear to be an increase in concentration levels for most volunteers. But let us test this with a t-test.  
+
+### T-Test
+
+Null hypothesis **Ho: mean difference between after and before = 0**  
+Alternative hypothesis **Ha: mean difference between after and before > 0**  
+
+Let "before" be the set of all concentration observations prior to meditation.
+And "after" be the set of all concentration observations post meditation.
+
+```{r conctest}
+
+before = meditate$concentration[meditate$timing=="before"]
+after = meditate$concentration[meditate$timing=="after"]
+
+t.test(after, before, paired = TRUE, alternative = "greater")
+
+```
+
+**Note that default confidence level of t-test is 95%, i.e. the desired rate of Type 1 Error is 5% or 0.05.**  
+  
+    
+How to interpret the results of this t-test? Let us see graphically: 
+
+```{r conctestplot, echo=FALSE, fig.width=10}
+
+# Store test results
+	test = t.test(after, before, paired = TRUE, alternative = "greater")
+
+	df = round(test$parameter,1)
+	tstat = round(test$statistic,1)
+	pvalue = round(test$p.value,6)
+
+	upper.x = round(qt(0.95, df),1)
+
+# Plot t-distribution curve
+	Tx = seq(-7,7,0.01)
+	Ty = dt(Tx, df = length(Tx)-1)
+	plot(Tx, Ty, type="l", lwd = 2, xlab="x", ylab="", yaxt="n")
+	title(main = "Hypothesis testing: one-sided t-test \n Ho = 0;  Ha > 0")
+
+# Plot test results
+	# Upper limit
+	abline(v = upper.x, col = "red", lty = 2, lwd = 2) 
+
+	# Acceptance region
+	accept.x = seq(-4, upper.x, by = 0.01)
+	accept.y = dt(accept.x, df = length(accept.x))
+	polygon(c(-4, accept.x, upper.x), c(0, accept.y, 0), col = "red", density = 16, lty = 2, border = FALSE)
+	
+	# T-statistic
+	abline(v = tstat, col = "blue", lwd = 2)
+
+	# Legend
+	legend("topleft", bty="n", lty=c(2,1), lwd=2, col=c("red","blue"), legend=c("Upper limit quantile","T-statistic"))
+
+	# Labeling
+	text(upper.x, 0.05, pos=2, "acceptance region", font = 2, cex=0.8)
+	text(upper.x, 0.1, pos = 4, col="red", font=2, paste("qt(0.95,",df,"): ",upper.x), cex = 0.8)
+	text(tstat, 0.2, pos = 2, col = "blue", font=2, paste("T: ",tstat), cex = 0.8)
+	text(tstat, 0.05, pos = 2, col = "black", font = 2, paste("P-value: ",pvalue), cex = 0.8)
+
+
+```
+
+We see that the **t-statistic lies well outside the acceptance region**, hence we must **reject Ho** or **accept Ha** that *mean of difference between "after" and "before" levels of concentration is greater than zero*.  
+
+
+### P-Value 
+
+From the t-test results, we see that the p-value is much smaller than the desired rate of Type 1 Error of 0.05 or 5%. This too supports rejection of Ho, as well as states that the alternative hypothesis, Ha--*mean difference between after and before levels of concentration is greater than zero*-- is statistically significant. 
+
+
+Meditation Promoters Institute could now claim that after 30-minutes of daily meditation for 6 months, its 12 test volunteers on an average did actually experience increase in concentration levels.
+
+
+## Hypothesis testing: Decreased stress
+
+Let us look at the "stress" data we have on the volunteers. 
+
+```{r stressplot, echo=FALSE}
+
+with(meditate, {
+
+# set stage
+plot(NA,NA, xlab = "", ylab = "", xlim = c(1,13), ylim = c(1,6))
+Axis(1:12, at = 1:12, side = 1)
+Axis(1:5, at = 1:5, side = 2)
+title(xlab = "Subject ID", ylab = "Stress Levels")
+title(main = "Stress Levels: Before and After")
+abline(v = 1:12, col = "lightgrey", lty = 3)
+abline(h = 1:5, col = "lightgrey", lty = 3)
+
+# plot before and after levels 
+points(x=subject.id[timing=="before"], y=stress[timing=="before"], pch = 15, col = "darkgrey", cex = 2)
+points(x=subject.id[timing=="after"], y=stress[timing=="after"], pch = 20, col = "lightgreen", cex = 2)
+
+# legend
+legend("topright", cex = 0.75, pch = c(15,20), pt.cex = 2, col = c("darkgrey","lightgreen"), legend=c("Before","After"), text.width = strwidth("Before"))
+
+})
+
+
+```
+
+
+There does appear to be a decrease in stress levels for most volunteers. But let us test this with a t-test.  
+
+### T-Test
+
+Null hypothesis **Ho: mean difference between after and before = 0**  
+Alternative hypothesis **Ha: mean difference between after and before < 0**  
+
+Let "before" be the set of all stress observations prior to meditation.
+And "after" be the set of all stress observations post meditation.
+
+```{r stresstest}
+
+before = meditate$stress[meditate$timing=="before"]
+after = meditate$stress[meditate$timing=="after"]
+
+t.test(after, before, paired = TRUE, alternative = "less")
+
+```
+
+
+How to interpret the results of this t-test? Let us see graphically: 
+
+```{r stresstestplot, echo=FALSE, fig.width=10}
+
+# Store test results
+	test = t.test(after, before, paired = TRUE, alternative = "less")
+
+	df = round(test$parameter,1)
+	tstat = round(test$statistic,1)
+	pvalue = round(test$p.value,6)
+
+	lower.x = round(qt(0.05, df),1)
+
+# Plot t-distribution curve
+	Tx = seq(-7,7,0.01)
+	Ty = dt(Tx, df = length(Tx)-1)
+	plot(Tx, Ty, type="l", lwd = 2, xlab="x", ylab="", yaxt="n")
+	title(main = "Hypothesis testing: one-sided t-test \n Ho = 0;  Ha < 0")
+
+# Plot test results
+	# Lower limit
+	abline(v = lower.x, col = "red", lty = 2, lwd = 2) 
+
+	# Acceptance region
+	accept.x = seq(lower.x, 4, by = 0.01)
+	accept.y = dt(accept.x, df = length(accept.x))
+	polygon(c(lower.x, accept.x, 4), c(0, accept.y, 0), col = "red", density = 16, lty = 2, border = 
+FALSE)
+	
+	# T-statistic
+	abline(v = tstat, col = "blue", lwd = 2)
+
+	# Legend
+	legend("topright", bty="n", lty=c(2,1), lwd=2, col=c("red","blue"), legend=c("Lower limit quantile","T-statistic"))
+
+	# Labeling
+	text(lower.x, 0.05, pos=4, "acceptance region", font = 2, cex=0.8)
+	text(lower.x, 0.1, pos = 2, col="red", font=2, paste("qt(0.05,",df,"): ",lower.x), cex = 0.8)
+	text(tstat, 0.2, pos = 4, col = "blue", font=2, paste("T: ",tstat), cex = 0.8)
+	text(tstat, 0.05, pos = 4, col = "black", font = 2, paste("P-value: ",pvalue), cex = 0.8)
+
+
+```
+
+We see that the **t-statistic lies well outside the acceptance region**, hence we must **reject Ho** or **accept Ha** that *mean of difference between "after" and "before" levels of stress is less than zero*.  
+
+
+### P-Value
+
+From the t-test results, we see that the p-value is much smaller than the desired rate of Type 1 Error of 0.05 or 5%. This supports rejection of Ho and also states that the alternative hypothesis, Ha--*mean difference between after and before levels of stress is less than zero*--is statistically significant. 
+
+
+Meditation Promoters Institute could now claim that after 30-minutes of daily meditation for 6 months, its 12 test volunteers on an average did actually experience decrease in stress levels.
+
+
+
+## Hypothesis testing: No significant change in weight
+
+Let us look at the "weight" data we have on the volunteers. 
+
+```{r weightplot, echo=FALSE}
+
+with(meditate, {
+
+# set stage
+plot(NA,NA, xlab = "", ylab = "", xlim = c(1,13), ylim = c(54,67))
+Axis(1:12, at = 1:12, side = 1)
+title(xlab = "Subject ID", ylab = "Weight (kg)")
+title(main = "Weight: Before and After")
+abline(v = 1:12, col = "lightgrey", lty = 3)
+abline(h = 1:5, col = "lightgrey", lty = 3)
+
+# plot before and after levels 
+points(x=subject.id[timing=="before"], y=weight[timing=="before"], pch = 15, col = "darkgrey", cex = 2)
+points(x=subject.id[timing=="after"], y=weight[timing=="after"], pch = 20, col = "lightgreen", cex = 2)
+
+# legend
+legend("topright", cex = 0.75, pch = c(15,20), pt.cex = 2, col = c("darkgrey","lightgreen"), legend=c("Before","After"), text.width = strwidth("Before"))
+
+})
+
+
+```
+
+
+There appears to be some change in weight levels for some volunteers - a few have gained, others have lost. Yet others show no change. But, we are not sure if there is a significant change on the whole. So, let us test this with a t-test.  
+
+
+### T-Test
+
+Null hypothesis **Ho: mean difference between after and before = 0**  
+Alternative hypothesis **Ha: mean difference between after and before != 0**  
+
+Let "before" be the set of all weight observations prior to meditation.
+And "after" be the set of all weight observations post meditation.
+
+```{r weighttest}
+
+before = meditate$weight[meditate$timing=="before"]
+after = meditate$weight[meditate$timing=="after"]
+
+t.test(after, before, paired = TRUE, alternative = "two.sided")
+
+```
+
+How to interpret the results of this t-test? Let us see graphically: 
+
+```{r weighttestplot, echo=FALSE, fig.width=10}
+
+# Store test results
+	test = t.test(after, before, paired = TRUE, alternative = "two.sided")
+
+	df = round(test$parameter,1)
+	tstat = round(test$statistic,1)
+	pvalue = round(test$p.value,6)
+
+	lower.x = round(qt(0.025, df),1)
+	upper.x = round(qt(0.975, df),1)
+
+# Plot t-distribution curve
+	Tx = seq(-7,7,0.01)
+	Ty = dt(Tx, df = length(Tx)-1)
+	plot(Tx, Ty, type="l", lwd = 2, xlab="x", ylab="", yaxt="n")
+	title(main = "Hypothesis testing: two-sided t-test \n Ho = 0;  Ha != 0")
+
+# Plot test results
+	# Lower and upper limits
+	abline(v = lower.x, col = "red", lty = 2, lwd = 2) 
+	abline(v = upper.x, col = "red", lty = 4, lwd = 2)
+
+	# Acceptance region
+	accept.x = seq(lower.x, upper.x, by = 0.01)
+	accept.y = dt(accept.x, df = length(accept.x))
+	polygon(c(lower.x, accept.x, upper.x), c(0, accept.y, 0), col = "red", density = 16, lty = 2, border = 
+FALSE)
+	
+	# T-statistic
+	abline(v = tstat, col = "blue", lwd = 2)
+
+	# Legend
+	legend("topright", bty="n", lty=c(2,1,4), lwd=2, col=c("red","blue","red"), legend=c("Lower limit quantile","T-statistic","Upper limit quantile"))
+
+	# Labeling
+	text(0, 0.05, "acceptance region", font = 2, cex=0.8)
+	
+	text(lower.x, 0.1, pos = 2, col="red", font=2, paste("qt(0.025,",df,"): ",lower.x), cex = 0.8)
+	text(upper.x, 0.1, pos = 4, col="red", font=2, paste("qt(0.975,",df,"): ",upper.x), cex = 0.8)
+	
+	text(tstat, 0.4, pos = 2, col = "blue", font=2, paste("T: ",tstat), cex = 0.8)
+	text(tstat, 0.4, pos = 4, col = "black", font = 2, paste("P-value:",pvalue), cex = 0.8)
+
+
+```
+
+We see that the **t-statistic lies well within the acceptance region**, hence we must **reject Ha** or **accept Ho** that *mean of difference between "after" and "before" levels of weight is zero*.  
+
+
+### P-Value
+
+From the t-test results, we see that the p-value is much larger than the desired rate of Type 1 error of 0.05 or 5%. This supports acceptance of Ho or we fail to reject Ho. It also states that the alternative hypothesis, Ha--*mean difference between after and before levels of weight is not equal to zero*--is not statistically significant. 
+
+
+Meditation Promoters Institute could now claim that after 30-minutes of daily meditation for 6 months, its 12 test volunteers on an average did not experience significant change in weight levels.
+
+
+## Conclusion
+
+
+Ho | Ha | Test to use | Aceptance region 
+--------------------|----------------------|--------------------------------|---------------------
+mean difference = 0 | mean difference != 0 | t.test(x, y, paired = TRUE, alternative = "two.sided") | Lower bound = qt(0.025, df); Upper bound = qt(0.975, df) 
+mean difference = 0 | mean difference < 0 | t.test(x, y, paired = TRUE, alternative = "less") | Lower bound = qt(0.05, df); Upper bound = +ve infinity
+mean difference = 0 | mean difference > 0 | t.test(x, y, paired = TRUE, alternative = "greater") | Lower bound = -ve infinity; Upper bound = qt(0.95, df)
+  
+  
+And in all three cases above, if T-STATISTIC is  
+
+Within acceptance region | Outside acceptance region
+-----------------|-----------------
+Accept Ho, reject Ha | Reject Ho, accept Ha  
+  
+  
+And if P-VALUE is  
+
+Smaller than Type 1 Error rate | Larger than Type 1 Error rate
+-----------------|-----------------
+Ha is statistically significant | Ha is not statistically significant
